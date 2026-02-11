@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  name          String?
+  passwordHash  String?
+  image         String?
+  memberships   FamilyMember[]
+  transactions  Transaction[]  @relation("PaidTransactions")
+  healthRecords HealthRecord[]
+  dailyLogs     DailyLog[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Family {
+  id           String         @id @default(cuid())
+  name         String
+  description  String?
+  inviteCode   String?        @unique
+  members      FamilyMember[]
+  categories   Category[]
+  transactions Transaction[]
+  pocketMoneys PocketMoney[]
+  budgets      Budget[]
+  healthRecords HealthRecord[]
+  dailyLogs    DailyLog[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model FamilyMember {
+  id         String   @id @default(cuid())
+  role       Role     @default(MEMBER)
+  family     Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  familyId   String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  joinedAt   DateTime @default(now())
+  pocketMoneys PocketMoney[] @relation("ChildPocketMoney")
+
+  @@unique([familyId, userId])
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+  CHILD
+}
+
+model Category {
+  id            String         @id @default(cuid())
+  name          String
+  type          CategoryType
+  family        Family         @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  familyId      String
+  parentId      String?
+  parent        Category?      @relation("Subcategories", fields: [parentId], references: [id])
+  subcategories Category[]     @relation("Subcategories")
+  transactions  Transaction[]
+  budgets       Budget[]
+  createdAt     DateTime       @default(now())
+}
+
+enum CategoryType {
+  INCOME
+  EXPENSE
+}
+
+model Budget {
+  id         String   @id @default(cuid())
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId String
+  family     Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  familyId   String
+  month      DateTime
+  amount     Float
+
+  @@unique([familyId, categoryId, month])
+}
+
+model Transaction {
+  id             String        @id @default(cuid())
+  amount         Float
+  description    String?
+  date           DateTime      @default(now())
+  type           CategoryType
+  category       Category      @relation(fields: [categoryId], references: [id])
+  categoryId     String
+  family         Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  familyId       String
+  paidBy         User          @relation("PaidTransactions", fields: [paidById], references: [id])
+  paidById       String
+  pocketMoneyId  String?
+  pocketMoney    PocketMoney?  @relation(fields: [pocketMoneyId], references: [id], onDelete: SetNull)
+  attachment     String?
+  createdAt      DateTime      @default(now())
+}
+
+model PocketMoney {
+  id            String         @id @default(cuid())
+  child         FamilyMember   @relation("ChildPocketMoney", fields: [childId], references: [id], onDelete: Cascade)
+  childId       String
+  family        Family         @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  familyId      String
+  amount        Float
+  frequency     Frequency
+  nextDate      DateTime
+  transactions  Transaction[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+enum Frequency {
+  WEEKLY
+  MONTHLY
+  ONCE
+}
+
+model HealthRecord {
+  id          String     @id @default(cuid())
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  family      Family     @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  familyId    String
+  type        HealthType
+  date        DateTime   @default(now())
+  description String?
+  cost        Float?
+  doctorName  String?
+  createdAt   DateTime   @default(now())
+}
+
+enum HealthType {
+  APPOINTMENT
+  MEDICATION
+  SYMPTOM
+  WORKOUT
+}
+
+model DailyLog {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  family    Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  familyId  String
+  date      DateTime @default(now())
+  mood      Int?
+  activity  String?
+  notes     String?
+  createdAt DateTime @default(now())
+}
